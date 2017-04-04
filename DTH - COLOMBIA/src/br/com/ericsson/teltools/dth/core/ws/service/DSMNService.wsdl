@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<definitions name="DSMNService"  targetNamespace="http://webapps.online.ericsson.com" xmlns:tns="http://webapps.online.ericsson.com"
+    xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
+    <types>
+          <xsd:schema xmlns="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://webapps.online.ericsson.com">
+              
+              <complexType name="mapResult">
+                  <sequence>
+                      <element name="resultID" type="xsd:int" />
+                      <element maxOccurs="unbounded" minOccurs="1" name="item" type="tns:mapItem" />  
+                  </sequence>
+              </complexType>
+              
+              <complexType name="mapResponse">
+                   <sequence>
+                      <element name="responseID" type="xsd:int" />
+                      <element maxOccurs="unbounded" minOccurs="1" name="result" type="tns:mapResult" />
+                  </sequence>
+              </complexType>
+ 
+               <complexType name="dthResponse">
+                  <sequence>
+                      <element maxOccurs="unbounded" minOccurs="1" name="response" type="tns:mapResponse" />
+                  </sequence>
+              </complexType>
+                           
+              <element name="dthResponse" type="tns:dthResponse" />
+
+              <complexType name="mapItem">
+                  <sequence>
+                      <element name="key" type="xsd:string" />
+                      <element name="value" type="xsd:string" />  
+                  </sequence>
+              </complexType>
+                                          
+              <complexType name="mapSubscriber">
+                  <sequence>
+                      <element name="subscriberID" type="xsd:int" />
+                      <element maxOccurs="unbounded" minOccurs="1" name="item" type="tns:mapItem" />  
+                  </sequence>
+              </complexType>
+                                           
+              <complexType name="mapRequest">
+                  <sequence>
+                      <element name="requestID" type="xsd:int" />
+                      <element name="operation" type="xsd:string" />
+                      <element name="productName" type="xsd:string" />
+                      <element maxOccurs="unbounded" minOccurs="1" name="subscriber" type="tns:mapSubscriber" />
+                  </sequence>
+              </complexType>
+              
+              <complexType name="dthRequest">
+                  <sequence>
+                      <element maxOccurs="unbounded" minOccurs="1" name="request" type="tns:mapRequest" />
+                  </sequence>
+              </complexType>
+              
+              <element name="dthRequest" type="tns:dthRequest" />
+
+              <element name="ServiceFailedException" type="tns:ServiceFailedException" />
+              <complexType name="ServiceFailedException">
+                  <sequence>
+                      <element name="faultInfo" type="xsd:string" />
+                      <element name="message" type="xsd:string" />
+                  </sequence>
+              </complexType>
+
+          </xsd:schema>
+    </types>
+    
+    <message name="dthRequest">
+            <part name="request" element="tns:dthRequest" />
+    </message>
+    
+    <message name="dthResponse">
+            <part name="response" element="tns:dthResponse" />
+    </message>
+    
+    <message name="serviceFailedException">
+            <part name="ServiceFailedException" element="tns:ServiceFailedException" />
+    </message>
+    
+    <portType name="DSMNServicePortType">
+            <operation name="dthRequest">
+                <input name="dthRequest" message="tns:dthRequest" />
+                <output name="dthResponse" message="tns:dthResponse" />
+                <fault name="serviceFailedException" message="tns:serviceFailedException"/>
+            </operation>
+    </portType>
+    
+    <binding name="DSMNServiceBinding" type="tns:DSMNServicePortType">
+            <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document" />
+            <operation name="dthRequest">
+                <soap:operation soapAction="" />
+                <input>
+                    <soap:body use="literal" />
+                </input>
+                <output>
+                    <soap:body use="literal" />
+                </output>
+                <fault name="serviceFailedException">
+                    <soap:fault name="serviceFailedException" use="literal" />
+                </fault>
+            </operation>
+    </binding>
+    
+    <service name="DSMNServiceService">
+            <port name="DSMNServicePort" binding="tns:DSMNServiceBinding">
+                <soap:address location="http://localhost:1100/service/service.ws" />
+            </port>
+    </service>
+</definitions>

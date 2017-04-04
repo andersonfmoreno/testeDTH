@@ -1,0 +1,212 @@
+package com.ericsson.webapps;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.TreeMap;
+import java.util.Iterator;
+import java.util.Scanner; 
+
+import java.util.logging.Level;
+
+import javax.jws.WebService;
+import javax.xml.ws.Endpoint;
+
+import com.ericsson.utils.ResponseProvisionValidator;
+
+import cmg.stdapp.webservicesfe.external.AbstractWebService;
+
+import com.ericsson.online.webapps.DsmnRequest;
+import com.ericsson.online.webapps.DsmnResponse;
+import com.ericsson.online.webapps.MapItem;
+import com.ericsson.online.webapps.MapRequest;
+import com.ericsson.online.webapps.MapSubscriber;
+import com.ericsson.online.webapps.MapResponse;
+import com.ericsson.online.webapps.MapResult;
+import com.ericsson.online.webapps.DSMNProvisionPortType;
+import com.ericsson.online.webapps.ServiceFailedException;
+import com.ericsson.online.webapps.ServiceFailedException_Exception;
+
+@WebService(
+    serviceName = "DSMNProvisionService",
+    portName = "DSMNProvisionPort",
+    targetNamespace = "http://webapps.online.ericsson.com",
+    endpointInterface="com.ericsson.online.webapps.DSMNProvisionPortType")
+public class DSMNProvisionImpl extends AbstractWebService implements DSMNProvisionPortType 
+{
+    public List<MapResponse> dthRequest(List<MapRequest> dthRequest) throws ServiceFailedException_Exception
+    {
+        // Create HashMap to send data to Online business logic
+        HashMap<String, Object> parameterMap = new HashMap<String, Object>();
+        
+        // Variables to read the dthRequest list and map it to the parameterMap hashmap
+        MapRequest theInputRequest = new MapRequest();
+        int requestID = 0;
+        int subscriberID = 0;
+        String operation = new String();
+        String productName = new String();
+
+        // To read each element in the dthRequest list
+        Iterator iterRequest = dthRequest.iterator();
+
+        // For each element in the dthRequest list
+        while (iterRequest.hasNext())
+        {
+            // Get an individual request
+            theInputRequest = (MapRequest) iterRequest.next();
+            
+            requestID = theInputRequest.getRequestID();
+            operation = theInputRequest.getOperation();
+            productName = theInputRequest.getProductName();
+            
+            // Insert the Operation and Product Name into the MapEvent in the 
+            // format <Request ID.operation, operation> and <Request ID.productName, productName>
+            //parameterMap.put(requestID + ".requestID", requestID);
+        parameterMap.put(requestID + ".operation", operation);
+            parameterMap.put(requestID + ".productName", productName);
+        
+            // For each individual subscriber in this request
+            for (MapSubscriber theInputSubscriber : theInputRequest.getSubscriber())
+            {
+                subscriberID = theInputSubscriber.getSubscriberID();
+        
+        for (MapItem theInputItem : theInputSubscriber.getItem()) 
+                { 
+                    // Insert each <Key, Value> element into the MapEvent using the format <Request ID.Subscriber ID.Key, Value>
+                    parameterMap.put(requestID + "." + subscriberID + "." + theInputItem.getKey(), theInputItem.getValue());
+                }
+            }
+        }
+
+        // Send HashMap to Online business logic
+        parameterMap = processRequest(parameterMap);
+        
+        // Validate response for timeouts etc.
+        ResponseProvisionValidator.validateResponse(parameterMap);
+        
+        // Remove the OLM default return parameters. The business logic will use its own parameters to replace them.
+        // If the parameters are already removed from the returning MapEvent, the function will return null.
+        Object ws_requestID = parameterMap.remove("WS_requestID");
+        Object ws_resultCode = parameterMap.remove("WS_resultCode");
+        Object ws_GlobalTransactionID = parameterMap.remove("__GlobalTransactionID");
+        
+        // Put all returned keys in order. It is aphabetical ordering, but still serves the purpose
+        Map sortedParameterMap = new TreeMap(parameterMap);
+        
+        // The output structures
+        List<MapResponse> theFinalResponse = new ArrayList<MapResponse>();
+        MapResponse theOutputMapResponse = new MapResponse();
+        MapResult theOutputMapResult = new MapResult();
+        MapItem theOutputMapItem = new MapItem(); 
+String interruptPointView = "Sentinel Point View";
+        // Initialize the scanner to move throught the "." separated tokens
+        Scanner scanResponse = null;
+        
+        // Auxiliary variables
+        int responseID = 0;
+        int resultID = 0;
+        int oldResultID = -1;
+        String keyName = new String();
+        
+        // Read the MapEvent and create the final response
+        for (Object theOutputResponse : sortedParameterMap.keySet())
+        {                                
+            scanResponse = new Scanner(theOutputResponse.toString());
+            scanResponse.useDelimiter("\\.");
+            interruptPointView = "OutputResponse Start -+-+- " + theOutputResponse.toString() + " -+-+- OutputResponse End";
+if (interruptPointView.equals("DbLookUpResultCode")) continue;
+            // The first "." separates the response ID from the result ID
+            if (scanResponse.hasNextInt())
+            {  
+                // Get the response ID
+                responseID = scanResponse.nextInt();
+                               
+                // If we have a new response ID, lets save the old one and set the new response ID        
+                if (theOutputMapResponse.getResponseID() != responseID) 
+                { 
+                    // Add the result to the response only if we are at the last result for the previous response ID
+                    if (oldResultID != -1) 
+                    {
+                        theOutputMapResponse.getResult().add(theOutputMapResult);
+                        theOutputMapResult = new MapResult();
+                    
+                        theFinalResponse.add(theOutputMapResponse);                 
+                        theOutputMapResponse = new MapResponse();
+                    }
+        
+                    // Set the new response ID
+                    theOutputMapResponse.setResponseID(responseID);
+                    oldResultID = -1;
+                }
+ 
+                // The second "." separates the result ID from the key
+                if (scanResponse.hasNextInt())
+                {     
+                    // Get the result ID
+                    resultID = scanResponse.nextInt();
+                                       
+                    // If we have a new result ID, lets save the old one and set the new result ID  
+                    if (oldResultID != resultID)
+                    {
+                        // Only add the result to the response if we already have at least one result
+                        if (oldResultID != -1) 
+                        {
+                            theOutputMapResponse.getResult().add(theOutputMapResult);
+                            theOutputMapResult = new MapResult();
+                        }
+                        
+                        // Set the new result ID
+                        theOutputMapResult.setResultID(resultID);
+                        oldResultID = resultID;
+                    }                 
+                    
+                    // Get the key, even if it has the "." character
+                    keyName = new String();
+                    while (scanResponse.hasNext()) keyName += scanResponse.next() + ".";
+                    
+                    // Set the key and value pair
+                    if (keyName.lastIndexOf('.') > 0) 
+                    {
+                        theOutputMapItem.setKey(keyName.substring(0, keyName.lastIndexOf('.')));
+                    } else {
+                        theOutputMapItem.setKey("");
+                    }
+                    
+                    theOutputMapItem.setValue(String.valueOf(sortedParameterMap.get(theOutputResponse.toString())));
+
+                    // Add the item to the result map
+                    theOutputMapResult.getItem().add(theOutputMapItem);
+                    theOutputMapItem = new MapItem(); 
+                } else {
+                    // Return error to Online
+                    if (isLoggable(Level.SEVERE)) error("Error in business logic response: Wrong key format for WSDL result");
+                    
+                    // Return error to the client
+                    ServiceFailedException exception = new ServiceFailedException();
+                    exception.setFaultInfo("Error in business logic response: Wrong key format for WSDL result");            
+                    throw new ServiceFailedException_Exception("Error", exception);
+                }
+            } else {
+                // Return error to Online
+                if (isLoggable(Level.SEVERE)) error("Error in business logic response: Wrong key format for WSDL response" + "PP==" + interruptPointView + "==PP");
+                
+                // Return error to the client
+                ServiceFailedException exception = new ServiceFailedException();
+                exception.setFaultInfo("Error in business logic response: Wrong key format for WSDL response"  + "PP==" + interruptPointView + "==PP");            
+                throw new ServiceFailedException_Exception("Error", exception);
+            }
+            
+            // Closing the scanner object
+            scanResponse.close();
+        }
+        
+        // For the very last element in the sortedParameterMap.keySet, insert the last map data into the final response
+        theOutputMapResponse.getResult().add(theOutputMapResult);
+        theFinalResponse.add(theOutputMapResponse);
+                
+        // Return Map to client        
+        return theFinalResponse;
+       
+    }
+}

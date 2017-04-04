@@ -1,0 +1,38 @@
+package com.ericsson.utils;
+
+import com.ericsson.online.webapps.ServiceFailedException_Exception;
+import com.ericsson.online.webapps.ServiceFailedException;
+import java.util.HashMap;
+import com.ericsson.webapps.DSMNServiceImpl;
+
+/**
+ * Util class to check if an error occured in business logic
+ */
+public class ResponseServiceValidator
+{
+    public static void validateResponse(HashMap<String, Object> responseParameters)
+        throws ServiceFailedException_Exception
+    {    
+        Integer resultCode = (Integer)responseParameters.get("WS_resultCode");
+        
+        if(resultCode == DSMNServiceImpl.TIMEOUT)
+        {
+            ServiceFailedException exception = new ServiceFailedException();
+            exception.setFaultInfo("Timeout in business logic");            
+            throw new ServiceFailedException_Exception("Timeout", exception);
+        }
+        else if(resultCode == DSMNServiceImpl.FAILED)
+        {
+            ServiceFailedException exception = new ServiceFailedException();
+            exception.setFaultInfo("Failure in business logic");            
+            throw new ServiceFailedException_Exception("Failure", exception);
+        }
+        else if(resultCode == DSMNServiceImpl.CONGESTION)
+        {
+            ServiceFailedException exception = new ServiceFailedException();
+            exception.setFaultInfo("Congestion in business logic");            
+            throw new ServiceFailedException_Exception("Congestion", exception);
+        }
+    }
+ 
+}
